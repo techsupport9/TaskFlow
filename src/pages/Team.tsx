@@ -283,7 +283,7 @@ export default function Team() {
   // Filter users based on current user's role visibility rules:
   // - Super Admin: sees only Admins
   // - Admin: sees other Admins and Core Managers
-  // - Core Manager: sees Admins and other Core Managers
+  // - Core Manager: sees only other Core Managers (no Administrators)
   const visibleUsers = users.filter((u: User) => {
     if (!user) return false;
     
@@ -294,8 +294,8 @@ export default function Team() {
       // Admin can see other Admins and Core Managers
       return u.role === 'admin' || u.role === 'core_manager';
     } else if (user.role === 'core_manager') {
-      // Core Manager can see Admins and other Core Managers
-      return u.role === 'admin' || u.role === 'core_manager';
+      // Core Manager can only see other Core Managers
+      return u.role === 'core_manager';
     }
     return false;
   });
@@ -434,7 +434,7 @@ export default function Team() {
                 ? 'Manage your organization\'s admins.'
                 : user?.role === 'admin'
                 ? 'Manage admins and core team members.'
-                : 'View admins and team members in your organization.'}
+                : 'View core team managers in your organization.'}
             </p>
           </div>
 
@@ -692,15 +692,9 @@ export default function Team() {
                   </>
                 )}
 
-                {/* Core Manager: Shows Admins and Core Managers in separate sections */}
+                {/* Core Manager: Shows only Core Managers */}
                 {isCoreManagerUser && (
                   <>
-                    {renderMemberSection(
-                      adminMembers, 
-                      'Administrators', 
-                      <Shield className="w-4 h-4 text-amber-500" />,
-                      adminMembers.length > 0
-                    )}
                     {renderMemberSection(
                       coreManagerMembers, 
                       'Core Managers', 
