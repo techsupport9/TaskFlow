@@ -1,0 +1,33 @@
+# Task Manager Verification Plan
+
+## 1. User Authentication & Authorization
+- [ ] **Admin Login**: Can login successfully, sees Admin Dashboard.
+- [ ] **Manager Login**: Can login, sees Manager Dashboard (Team Overview).
+- [ ] **Employee Login**: Can login, sees Employee Dashboard (Personal Agenda).
+- [ ] **Logout**: All roles can logout gracefully.
+
+## 2. Team Management (Admins/Managers)
+- [ ] **Admin Add Member**: Can create Manager or Team Member.
+- [ ] **Manager Add Member**: Can create Team Member (Role selection restricted? Manager option hidden?).
+- [ ] **List View (Bug Fix)**: Verify "Tasks Assigned" count is correct (not 0) for each member.
+- [ ] **Delete Member**: Admin can delete anyone. Manager can delete team members (needs verification of permissions).
+
+## 3. Task Management (Core)
+- [ ] **Create Task (Admin)**: Can assign to multiple people.
+- [ ] **Create Task (Manager)**: Can assign to team members.
+- [ ] **Create Task (Employee)**: Cannot create tasks (or can only create for self? UI shows alert).
+- [ ] **Assignment Bug**: Verify assigned task appears in Assignee's dashboard.
+- [ ] **Visibility**:
+    - [ ] `Public`: Visible to everyone.
+    - [ ] [Team](file:///c:/Users/aryab/Internship/Task%20Manager/src/types/taskflow.ts#18-27): Visible to team.
+    - [ ] `Private`: Visible only to assignees.
+    - [ ] `Custom`: Visible to specific viewers.
+
+## 4. Dashboard Stats
+- [ ] **Admin Stats**: Total Active Tasks matches Sum of all active tasks.
+- [ ] **Manager Stats**: Active Tasks matches their team's tasks.
+- [ ] **Employee Stats**: "My Active Tasks" matches tasks assigned to me.
+
+## 5. UI/UX
+- [ ] **Mobile Responsiveness**: Sidebar collapses/expands.
+- [ ] **Notifications**: (If enabled) Toasts appear on success/error.
