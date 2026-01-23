@@ -80,7 +80,7 @@ export function useTaskPermissions(task: Task | null | undefined): TaskPermissio
     return {
       // Super admins have no task permissions; Admins own tasks; Core managers execute
       canEdit: isAdmin || (isCoreManager && isCreator),
-      canDelete: isAdmin,
+      canDelete: isAdmin || (isCoreManager && isCreator),
       canAssign: isAdmin,
       canTransfer: isAdmin && managesTeam,
       canCreateSubtask: isAdmin,
