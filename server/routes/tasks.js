@@ -1,5 +1,5 @@
 import express from 'express';
-import { getTasks, createTask, updateTask, deleteTask, archiveOldTasks, restoreTask } from '../controllers/tasks.js';
+import { getTasks, createTask, updateTask, deleteTask, archiveOldTasks, restoreTask, updateTaskOrder } from '../controllers/tasks.js';
 import { verifyToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -12,6 +12,9 @@ router.post('/', verifyToken, createTask);
 
 // Update
 router.patch('/:id', verifyToken, updateTask);
+
+// Update task order (bulk)
+router.patch('/order/update', verifyToken, updateTaskOrder);
 
 // Restore archived task
 router.patch('/:id/restore', verifyToken, restoreTask);

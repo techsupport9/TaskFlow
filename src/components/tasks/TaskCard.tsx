@@ -31,8 +31,10 @@ const getStatusVariant = (status: string, isOverdue: boolean) => {
   }
 };
 
-const getStatusLabel = (status: string, isOverdue: boolean) => {
-  if (isOverdue) return 'Delayed';
+const getStatusLabel = (status: string, isOverdue: boolean, daysDelayed?: number) => {
+  if (isOverdue) {
+    return daysDelayed && daysDelayed > 0 ? `Delayed (${daysDelayed}d)` : 'Delayed';
+  }
   switch (status) {
     case 'pending': return 'Pending';
     case 'in_progress': return 'In Progress';
@@ -45,6 +47,7 @@ const getStatusLabel = (status: string, isOverdue: boolean) => {
 export function TaskCard({ task, onClick, compact = false }: TaskCardProps) {
   const isOverdue = isPast(new Date(task.dueDate)) && task.status !== 'completed';
   const daysUntilDue = differenceInDays(new Date(task.dueDate), new Date());
+  const daysDelayed = isOverdue ? Math.abs(daysUntilDue) : 0;
   const assignees = task.assignments || [{ userId: '?', userName: task.assignedToName }];
   const isNearDue = daysUntilDue >= 0 && daysUntilDue <= 2 && task.status !== 'completed';
 
@@ -70,7 +73,7 @@ export function TaskCard({ task, onClick, compact = false }: TaskCardProps) {
             {task.priority}
           </Badge>
           <Badge variant={getStatusVariant(task.status, isOverdue) as any} className="text-[9px] px-1 py-0">
-            {getStatusLabel(task.status, isOverdue)}
+            {getStatusLabel(task.status, isOverdue, daysDelayed)}
           </Badge>
         </div>
 
@@ -101,11 +104,19 @@ export function TaskCard({ task, onClick, compact = false }: TaskCardProps) {
           !isOverdue && !isNearDue && 'text-muted-foreground'
         )}>
           {isOverdue ? (
-            <AlertTriangle className="w-2.5 h-2.5" />
+            <>
+              <AlertTriangle className="w-2.5 h-2.5" />
+              <span>{format(new Date(task.dueDate), 'MMM d')}</span>
+              {daysDelayed > 0 && (
+                <span className="font-semibold">({daysDelayed}d)</span>
+              )}
+            </>
           ) : (
-            <Calendar className="w-2.5 h-2.5" />
+            <>
+              <Calendar className="w-2.5 h-2.5" />
+              <span>{format(new Date(task.dueDate), 'MMM d')}</span>
+            </>
           )}
-          <span>{format(new Date(task.dueDate), 'MMM d')}</span>
         </div>
       </div>
     );
@@ -134,7 +145,7 @@ export function TaskCard({ task, onClick, compact = false }: TaskCardProps) {
           {task.priority}
         </Badge>
         <Badge variant={getStatusVariant(task.status, isOverdue) as any} className="text-[9px] px-1 py-0">
-          {getStatusLabel(task.status, isOverdue)}
+          {getStatusLabel(task.status, isOverdue, daysDelayed)}
         </Badge>
       </div>
 
@@ -178,11 +189,19 @@ export function TaskCard({ task, onClick, compact = false }: TaskCardProps) {
             isNearDue && !isOverdue && 'text-warning'
           )}>
             {isOverdue ? (
-              <AlertTriangle className="w-2.5 h-2.5" />
+              <>
+                <AlertTriangle className="w-2.5 h-2.5" />
+                <span>{format(new Date(task.dueDate), 'MMM d')}</span>
+                {daysDelayed > 0 && (
+                  <span className="font-semibold">({daysDelayed}d)</span>
+                )}
+              </>
             ) : (
-              <Calendar className="w-2.5 h-2.5" />
+              <>
+                <Calendar className="w-2.5 h-2.5" />
+                <span>{format(new Date(task.dueDate), 'MMM d')}</span>
+              </>
             )}
-            <span>{format(new Date(task.dueDate), 'MMM d')}</span>
           </div>
         </div>
       </div>

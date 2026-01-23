@@ -52,7 +52,7 @@ export const getTasks = async (req, res) => {
         }
 
         let tasks = await Task.find(query)
-            .sort({ updatedAt: -1 })
+            .sort({ order: 1, updatedAt: -1 })
             .populate('assignments.userId', 'name email avatar department role')
             .populate('comments.userId', 'name email avatar')
             .populate('createdBy', 'name role')
@@ -819,6 +819,31 @@ export const restoreTask = async (req, res) => {
             .populate('createdBy', 'name');
 
         res.status(200).json(populated);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+// Update task order (bulk update)
+export const updateTaskOrder = async (req, res) => {
+    try {
+        const { taskOrders } = req.body; // Array of { taskId, order }
+        
+        if (!Array.isArray(taskOrders)) {
+            return res.status(400).json({ message: "taskOrders must be an array" });
+        }
+
+        // Update all tasks in a single transaction
+        const bulkOps = taskOrders.map(({ taskId, order }) => ({
+            updateOne: {
+                filter: { _id: taskId },
+                update: { $set: { order: order } }
+            }
+        }));
+
+        await Task.bulkWrite(bulkOps);
+
+        res.status(200).json({ message: "Task order updated successfully" });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

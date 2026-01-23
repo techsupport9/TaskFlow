@@ -84,6 +84,7 @@ export interface Task {
   archivedAt?: Date | string;
   isArchived: boolean;
   delayDays?: number;
+  order?: number;
 }
 
 export interface TaskComment {

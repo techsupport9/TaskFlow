@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,12 +11,16 @@ import { Task } from '@/types/taskflow';
 import { Search, CheckCircle, Calendar, CheckCircle2, RotateCcw, Loader2, AlertTriangle, Info, Trash2 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
+import { useSearchParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 export default function Archived() {
   const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
 
   // Fetch completed tasks
   const { data: archivedTasks = [], isLoading } = useQuery({
@@ -82,6 +87,40 @@ export default function Archived() {
     return creatorId === (user?._id || user?.id);
   };
 
+  // Handle taskId from URL params (from notification clicks)
+  useEffect(() => {
+    const taskIdFromUrl = searchParams.get('taskId');
+    if (taskIdFromUrl && archivedTasks.length > 0) {
+      // Find the task in archived tasks
+      const task = archivedTasks.find((t: Task) => (t.id || (t as any)._id) === taskIdFromUrl);
+      if (task) {
+        setSelectedTask(task);
+        setDetailModalOpen(true);
+        // Remove taskId from URL to clean it up
+        searchParams.delete('taskId');
+        setSearchParams(searchParams, { replace: true });
+      }
+    }
+  }, [searchParams, archivedTasks, setSearchParams]);
+
+  const handleTaskClick = (task: Task) => {
+    setSelectedTask(task);
+    setDetailModalOpen(true);
+  };
+
+  const handleUpdateTask = (taskId: string, updates: Partial<Task>) => {
+    // For archived tasks, we might not allow updates, but keeping the handler for consistency
+    toast.info('Completed tasks cannot be updated');
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    if (confirm('Permanently delete this task? This cannot be undone.')) {
+      deleteMutation.mutate(taskId);
+      setDetailModalOpen(false);
+      setSelectedTask(null);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -146,7 +185,8 @@ export default function Archived() {
                       return (
                         <tr 
                           key={task._id || task.id} 
-                          className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                          className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors cursor-pointer"
+                          onClick={() => handleTaskClick(task)}
                         >
                           <td className="p-4">
                             <div className="flex items-center gap-3">
@@ -259,6 +299,16 @@ export default function Archived() {
             </div>
           </div>
         </div>
+
+        {/* Task Detail Modal */}
+        <TaskDetailModal
+          task={selectedTask}
+          open={detailModalOpen}
+          onOpenChange={setDetailModalOpen}
+          onUpdateTask={handleUpdateTask}
+          onCompleteTask={() => {}} // Completed tasks can't be completed again
+          onDeleteTask={handleDeleteTask}
+        />
       </div>
     </DashboardLayout>
   );

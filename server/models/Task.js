@@ -109,6 +109,10 @@ const TaskSchema = new mongoose.Schema({
         min: 0,
         max: 100
     },
+    order: {
+        type: Number,
+        default: 0,
+    },
     completedAt: Date,
     archivedAt: Date,
 }, { timestamps: true });

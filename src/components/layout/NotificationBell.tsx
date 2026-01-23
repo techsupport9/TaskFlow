@@ -69,12 +69,22 @@ export function NotificationBell() {
     // Close the popover
     setOpen(false);
     
-    // Navigate to tasks page (the task will be highlighted/selected there)
-    // For completed tasks, navigate to completed page
-    if (notification.type === 'task_completed') {
-      navigate('/archived');
+    // Navigate to the specific task
+    if (notification.taskId) {
+      // For completed tasks, navigate to archived page with taskId
+      if (notification.type === 'task_completed') {
+        navigate(`/archived?taskId=${notification.taskId}`);
+      } else {
+        // Navigate to tasks page with taskId in URL params
+        navigate(`/tasks?taskId=${notification.taskId}`);
+      }
     } else {
-      navigate('/tasks');
+      // Fallback: navigate to tasks page if no taskId
+      if (notification.type === 'task_completed') {
+        navigate('/archived');
+      } else {
+        navigate('/tasks');
+      }
     }
   };
 

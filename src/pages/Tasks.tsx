@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { TaskCard } from '@/components/tasks/TaskCard';
+import { SortableTaskCard } from '@/components/tasks/SortableTaskCard';
 import { TaskFilters } from '@/components/tasks/TaskFilters';
 import { QuickFilters } from '@/components/tasks/QuickFilters';
 import { CreateTaskModal } from '@/components/tasks/CreateTaskModal';
@@ -9,16 +10,35 @@ import { Button } from '@/components/ui/button';
 // import { mockTasks, mockEmployees } from '@/data/mockTasks'; // Removed mock data
 import { Task, TaskPriority } from '@/types/taskflow';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, LayoutGrid, List, Loader2 } from 'lucide-react';
-import { isPast } from 'date-fns';
+import { Plus, LayoutGrid, List, Loader2, Download } from 'lucide-react';
+import { isPast, differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '@/lib/api';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
+import * as XLSX from 'xlsx';
 
 export default function Tasks() {
   const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -32,6 +52,33 @@ export default function Tasks() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [taskView, setTaskView] = useState<'assigned-to-me' | 'assigned-by-me'>('assigned-to-me');
+  
+  // Local state for ordered tasks (for drag and drop)
+  const [orderedMyTasks, setOrderedMyTasks] = useState<Task[]>([]);
+  const [orderedTasksAssignedByMe, setOrderedTasksAssignedByMe] = useState<Task[]>([]);
+  const [orderedAllTasks, setOrderedAllTasks] = useState<Task[]>([]);
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Update Task Order Mutation
+  const updateTaskOrderMutation = useMutation({
+    mutationFn: async (taskOrders: { taskId: string; order: number }[]) => {
+      return await api.patch('/tasks/order/update', { taskOrders });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      toast.success('Task order updated');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to update task order');
+    }
+  });
 
   // Fetch Tasks
   const { data: tasks = [], isLoading } = useQuery({
@@ -238,6 +285,155 @@ export default function Tasks() {
   const filteredTasksAssignedByMe = useMemo(() => sortTasks(filterTasks(tasksAssignedByMe)), [tasksAssignedByMe, searchQuery, statusFilter, priorityFilter, assigneeFilter, assignedByFilter, sortBy]);
   const filteredAllTasks = useMemo(() => sortTasks(filterTasks(activeTasks)), [activeTasks, searchQuery, statusFilter, priorityFilter, assigneeFilter, assignedByFilter, sortBy]);
 
+  // Sync ordered tasks with filtered tasks (only when sortBy is 'none' to preserve manual order)
+  useEffect(() => {
+    if (sortBy === 'none') {
+      if (isAdmin) {
+        setOrderedAllTasks(filteredAllTasks);
+      } else {
+        if (taskView === 'assigned-to-me') {
+          setOrderedMyTasks(filteredMyTasks);
+        } else {
+          setOrderedTasksAssignedByMe(filteredTasksAssignedByMe);
+        }
+      }
+    } else {
+      // When sorting is active, use filtered tasks directly
+      if (isAdmin) {
+        setOrderedAllTasks(filteredAllTasks);
+      } else {
+        if (taskView === 'assigned-to-me') {
+          setOrderedMyTasks(filteredMyTasks);
+        } else {
+          setOrderedTasksAssignedByMe(filteredTasksAssignedByMe);
+        }
+      }
+    }
+  }, [filteredMyTasks, filteredTasksAssignedByMe, filteredAllTasks, sortBy, taskView, isAdmin]);
+
+  // Handle taskId from URL params (from notification clicks)
+  useEffect(() => {
+    const taskIdFromUrl = searchParams.get('taskId');
+    if (taskIdFromUrl && tasks.length > 0) {
+      // Find the task in all available tasks
+      const task = tasks.find((t: Task) => (t.id || (t as any)._id) === taskIdFromUrl);
+      if (task) {
+        setSelectedTask(task);
+        setDetailModalOpen(true);
+        // Remove taskId from URL to clean it up
+        searchParams.delete('taskId');
+        setSearchParams(searchParams, { replace: true });
+      }
+    }
+  }, [searchParams, tasks, setSearchParams]);
+
+  // Handle drag end
+  const handleDragEnd = (event: DragEndEvent, taskList: Task[], setTaskList: (tasks: Task[]) => void) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = taskList.findIndex((t) => (t.id || (t as any)._id) === active.id);
+      const newIndex = taskList.findIndex((t) => (t.id || (t as any)._id) === over.id);
+
+      const newOrder = arrayMove(taskList, oldIndex, newIndex);
+      setTaskList(newOrder);
+
+      // Update order in backend
+      const taskOrders = newOrder.map((task, index) => ({
+        taskId: task.id || (task as any)._id,
+        order: index,
+      }));
+
+      updateTaskOrderMutation.mutate(taskOrders);
+    }
+  };
+
+  // Excel Export Function
+  const exportToExcel = () => {
+    try {
+      let tasksToExport: Task[] = [];
+      
+      if (isAdmin) {
+        tasksToExport = filteredAllTasks;
+      } else {
+        if (taskView === 'assigned-to-me') {
+          tasksToExport = filteredMyTasks;
+        } else {
+          tasksToExport = filteredTasksAssignedByMe;
+        }
+      }
+
+      if (tasksToExport.length === 0) {
+        toast.error('No tasks to export');
+        return;
+      }
+
+      // Prepare data for Excel
+      const excelData = tasksToExport.map((task) => {
+        const assignees = task.assignments?.map((a: any) => {
+          const user = a.userId;
+          if (typeof user === 'object' && user?.name) {
+            return user.name;
+          }
+          return a.userName || 'Unknown';
+        }).join(', ') || task.assignedToName || 'Unassigned';
+
+        const creator = typeof task.createdBy === 'object' 
+          ? (task.createdBy as any)?.name 
+          : 'Unknown';
+
+        // Calculate days delayed
+        const isOverdue = isPast(new Date(task.dueDate)) && task.status !== 'completed';
+        const daysUntilDue = differenceInDays(new Date(task.dueDate), new Date());
+        const daysDelayed = isOverdue ? Math.abs(daysUntilDue) : 0;
+
+        return {
+          'Title': task.title,
+          'Description': task.description || '',
+          'Priority': task.priority,
+          'Status': task.status,
+          'Days Delayed': daysDelayed > 0 ? daysDelayed : '',
+          'Due Date': new Date(task.dueDate).toLocaleDateString(),
+          'Created Date': task.createdAt ? new Date(task.createdAt).toLocaleDateString() : '',
+          'Assigned To': assignees,
+          'Created By': creator,
+          'Comments Count': task.comments?.length || 0,
+        };
+      });
+
+      // Create workbook and worksheet
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      
+      // Set column widths
+      const colWidths = [
+        { wch: 30 }, // Title
+        { wch: 40 }, // Description
+        { wch: 10 }, // Priority
+        { wch: 12 }, // Status
+        { wch: 12 }, // Days Delayed
+        { wch: 12 }, // Due Date
+        { wch: 12 }, // Created Date
+        { wch: 25 }, // Assigned To
+        { wch: 20 }, // Created By
+        { wch: 12 }, // Comments Count
+      ];
+      ws['!cols'] = colWidths;
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Tasks');
+
+      // Generate filename with timestamp
+      const filename = `TaskFlow_Tasks_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      // Download
+      XLSX.writeFile(wb, filename);
+      toast.success(`Exported ${tasksToExport.length} tasks to Excel`);
+    } catch (error: any) {
+      console.error('Excel export error:', error);
+      toast.error(`Failed to export: ${error.message || 'Unknown error'}`);
+    }
+  };
+
   const handleCreateTask = (taskData: {
     title: string;
     description: string;
@@ -270,7 +466,7 @@ export default function Tasks() {
     setDetailModalOpen(true);
   };
 
-  const renderTaskList = (taskList: Task[], emptyMessage: string) => {
+  const renderTaskList = (taskList: Task[], emptyMessage: string, orderedList: Task[], setOrderedList: (tasks: Task[]) => void) => {
     if (taskList.length === 0) {
       return (
         <div className="card-elevated p-12 text-center">
@@ -279,82 +475,102 @@ export default function Tasks() {
       );
     }
 
+    // Use ordered list if sortBy is 'none', otherwise use filtered list
+    const displayList = sortBy === 'none' ? orderedList : taskList;
+    const taskIds = displayList.map(t => t.id || (t as any)._id);
+
     // Group tasks into rows of 6 for the 3|3 layout
     const rows: Task[][] = [];
-    for (let i = 0; i < taskList.length; i += 6) {
-      rows.push(taskList.slice(i, i + 6));
+    for (let i = 0; i < displayList.length; i += 6) {
+      rows.push(displayList.slice(i, i + 6));
     }
 
     if (viewMode === 'list') {
       // List view: compact horizontal rows with 3|3 split
       return (
-        <div className="max-h-[calc(100vh-320px)] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent space-y-4">
-          {rows.map((row, rowIndex) => {
-            const leftTasks = row.slice(0, 3);
-            const rightTasks = row.slice(3);
-            return (
-              <div key={rowIndex} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="flex flex-col gap-1">
-                  {leftTasks.map((task) => (
-                    <TaskCard
-                      key={task.id || (task as any)._id}
-                      task={task}
-                      onClick={() => handleTaskClick(task)}
-                      compact={true}
-                    />
-                  ))}
-                </div>
-                <div className="flex flex-col gap-1">
-                  {rightTasks.map((task) => (
-                    <TaskCard
-                      key={task.id || (task as any)._id}
-                      task={task}
-                      onClick={() => handleTaskClick(task)}
-                      compact={true}
-                    />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={(e) => handleDragEnd(e, displayList, setOrderedList)}
+        >
+          <SortableContext items={taskIds} strategy={rectSortingStrategy}>
+            <div className="max-h-[calc(100vh-320px)] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent space-y-4">
+              {rows.map((row, rowIndex) => {
+                const leftTasks = row.slice(0, 3);
+                const rightTasks = row.slice(3);
+                return (
+                  <div key={rowIndex} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="flex flex-col gap-1">
+                      {leftTasks.map((task) => (
+                        <SortableTaskCard
+                          key={task.id || (task as any)._id}
+                          task={task}
+                          onClick={() => handleTaskClick(task)}
+                          compact={true}
+                        />
+                      ))}
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      {rightTasks.map((task) => (
+                        <SortableTaskCard
+                          key={task.id || (task as any)._id}
+                          task={task}
+                          onClick={() => handleTaskClick(task)}
+                          compact={true}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </SortableContext>
+        </DndContext>
       );
     }
 
     // Grid view: 6 cards per row (3 | 3 with gap in middle)
     return (
-      <div className="max-h-[calc(100vh-320px)] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent space-y-4">
-        {rows.map((row, rowIndex) => {
-          const leftTasks = row.slice(0, 3);
-          const rightTasks = row.slice(3);
-          return (
-            <div key={rowIndex} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Left 3 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                {leftTasks.map((task) => (
-                  <TaskCard
-                    key={task.id || (task as any)._id}
-                    task={task}
-                    onClick={() => handleTaskClick(task)}
-                    compact={false}
-                  />
-                ))}
-              </div>
-              {/* Right 3 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                {rightTasks.map((task) => (
-                  <TaskCard
-                    key={task.id || (task as any)._id}
-                    task={task}
-                    onClick={() => handleTaskClick(task)}
-                    compact={false}
-                  />
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={(e) => handleDragEnd(e, displayList, setOrderedList)}
+      >
+        <SortableContext items={taskIds} strategy={rectSortingStrategy}>
+          <div className="max-h-[calc(100vh-320px)] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent space-y-4">
+            {rows.map((row, rowIndex) => {
+              const leftTasks = row.slice(0, 3);
+              const rightTasks = row.slice(3);
+              return (
+                <div key={rowIndex} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Left 3 */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {leftTasks.map((task) => (
+                      <SortableTaskCard
+                        key={task.id || (task as any)._id}
+                        task={task}
+                        onClick={() => handleTaskClick(task)}
+                        compact={false}
+                      />
+                    ))}
+                  </div>
+                  {/* Right 3 */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {rightTasks.map((task) => (
+                      <SortableTaskCard
+                        key={task.id || (task as any)._id}
+                        task={task}
+                        onClick={() => handleTaskClick(task)}
+                        compact={false}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </SortableContext>
+      </DndContext>
     );
   };
 
@@ -395,6 +611,16 @@ export default function Tasks() {
                 <List className="w-4 h-4" />
               </Button>
             </div>
+
+            {/* Export to Excel Button */}
+            <Button 
+              variant="outline" 
+              onClick={exportToExcel}
+              className="gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Export Excel
+            </Button>
 
             {/* Create Task Button (Admins and Core Managers) */}
             {(user?.role === 'admin' || user?.role === 'core_manager') && (
@@ -454,16 +680,16 @@ export default function Tasks() {
                 }}
                 hasActiveFilters={highPriorityOnly || delayedOnly}
               />
-              {renderTaskList(filteredMyTasks, 'No tasks assigned to you. Great job!')}
+              {renderTaskList(filteredMyTasks, 'No tasks assigned to you. Great job!', orderedMyTasks, setOrderedMyTasks)}
             </TabsContent>
 
             <TabsContent value="assigned-by-me" className="mt-6">
-              {renderTaskList(filteredTasksAssignedByMe, 'No tasks assigned by you.')}
+              {renderTaskList(filteredTasksAssignedByMe, 'No tasks assigned by you.', orderedTasksAssignedByMe, setOrderedTasksAssignedByMe)}
             </TabsContent>
           </Tabs>
         ) : (
           /* Admin sees all tasks directly */
-          renderTaskList(filteredAllTasks, 'No tasks found matching your filters.')
+          renderTaskList(filteredAllTasks, 'No tasks found matching your filters.', orderedAllTasks, setOrderedAllTasks)
         )}
       </div>
 
