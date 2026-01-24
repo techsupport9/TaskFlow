@@ -11,6 +11,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Tasks from "./pages/Tasks";
 import Archived from "./pages/Archived";
+import Notepad from "./pages/Notepad";
 import Team from "./pages/Team";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -32,6 +33,7 @@ const App = () => (
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/tasks" element={<Tasks />} />
                 <Route path="/archived" element={<Archived />} />
+                <Route path="/notepad" element={<Notepad />} />
                 <Route path="/team" element={<Team />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="*" element={<NotFound />} />

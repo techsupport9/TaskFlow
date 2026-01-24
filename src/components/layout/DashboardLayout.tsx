@@ -1,6 +1,8 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { NotificationBell } from './NotificationBell';
+import { FloatingNotepad } from '@/components/notepad/FloatingNotepad';
+import { FloatingActionButton } from '@/components/notepad/FloatingActionButton';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -12,6 +14,8 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { isAuthenticated, isLoading, user, isSuperAdmin } = useAuth();
+  const [isNotepadOpen, setIsNotepadOpen] = useState(false);
+  const [isNotepadMinimized, setIsNotepadMinimized] = useState(false);
 
   if (isLoading) {
     return (
@@ -93,6 +97,32 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           Copyright © 2025 AI GRP. All rights reserved.
         </p>
       </footer>
+
+      {/* Floating Notepad */}
+      {isNotepadOpen && !isNotepadMinimized && (
+        <FloatingNotepad
+          isOpen={isNotepadOpen}
+          onClose={() => {
+            setIsNotepadOpen(false);
+            setIsNotepadMinimized(false);
+          }}
+          onMinimize={() => setIsNotepadMinimized(true)}
+        />
+      )}
+
+      {/* Floating Action Button */}
+      <FloatingActionButton
+        onClick={() => {
+          if (isNotepadMinimized) {
+            setIsNotepadMinimized(false);
+            setIsNotepadOpen(true);
+          } else {
+            setIsNotepadOpen(!isNotepadOpen);
+          }
+        }}
+        isOpen={isNotepadOpen && !isNotepadMinimized}
+        isMinimized={isNotepadMinimized}
+      />
     </div>
   );
 }

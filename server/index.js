@@ -10,7 +10,11 @@ import cron from 'node-cron';
 import authRoutes from './routes/auth.js';
 import taskRoutes from './routes/tasks.js';
 import userRoutes from './routes/users.js';
-import notificationRoutes from './routes/notifications.js'; // Will need to create this
+import notificationRoutes from './routes/notifications.js';
+import noteRoutes from './routes/notes.js';
+
+// Model Imports for Cron Jobs
+import Note from './models/Note.js';
 
 dotenv.config();
 
@@ -44,6 +48,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/notes', noteRoutes);
 
 
 
@@ -62,6 +67,17 @@ cron.schedule('0 0 * * *', async () => {
         // console.log(`Archived ${result.modifiedCount} tasks.`);
     } catch (error) {
         console.error('Auto-archive job failed:', error);
+    }
+});
+
+// Auto-delete Notes Cron Job (Runs every day at 6:00 AM)
+cron.schedule('0 6 * * *', async () => {
+    console.log('Running auto-delete notes job at 6:00 AM...');
+    try {
+        const result = await Note.deleteMany({});
+        console.log(`Deleted ${result.deletedCount} notes at 6:00 AM.`);
+    } catch (error) {
+        console.error('Auto-delete notes job failed:', error);
     }
 });
 

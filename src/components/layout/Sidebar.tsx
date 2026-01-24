@@ -9,7 +9,8 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Zap
+  Zap,
+  FileText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,6 +21,7 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Tasks', href: '/tasks', icon: CheckSquare },
   { name: 'Completed', href: '/archived', icon: CheckCircle },
+  { name: 'Notepad', href: '/notepad', icon: FileText },
   { name: 'Team', href: '/team', icon: Users },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];

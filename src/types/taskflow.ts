@@ -142,3 +142,15 @@ export interface DashboardStats {
   slaComplianceRate: number;
   averageCompletionTime: number;
 }
+
+export interface Note {
+  _id?: string;
+  id: string;
+  title: string;
+  content: string;
+  userId: string;
+  isPinned: boolean;
+  color: string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
