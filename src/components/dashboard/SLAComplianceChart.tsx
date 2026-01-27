@@ -6,17 +6,20 @@ interface SLAComplianceChartProps {
 }
 
 export function SLAComplianceChart({ onTime, delayed }: SLAComplianceChartProps) {
+  const total = onTime + delayed;
+  const onTimePercent = total > 0 ? Math.round((onTime / total) * 100) : 0;
+  const delayedPercent = total > 0 ? Math.round((delayed / total) * 100) : 0;
+
   const data = [
-    { name: 'On Time', value: onTime, color: 'hsl(158, 64%, 42%)' },
-    { name: 'Delayed', value: delayed, color: 'hsl(0, 84%, 60%)' },
+    { name: 'On Time', value: onTime, percent: onTimePercent, color: 'hsl(158, 64%, 42%)' },
+    { name: 'Delayed', value: delayed, percent: delayedPercent, color: 'hsl(0, 84%, 60%)' },
   ];
 
-  const total = onTime + delayed;
-  const complianceRate = total > 0 ? Math.round((onTime / total) * 100) : 0;
+  const complianceRate = onTimePercent;
 
   return (
     <div className="card-elevated p-6 h-full">
-      <h3 className="text-lg font-semibold text-foreground mb-4">SLA Compliance</h3>
+      <h3 className="text-lg font-semibold text-foreground mb-4">Overall Delay</h3>
       <div className="h-64 relative">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -41,6 +44,10 @@ export function SLAComplianceChart({ onTime, delayed }: SLAComplianceChartProps)
                 borderRadius: '8px',
                 boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
               }}
+              formatter={(value: number, name: string, props: any) => [
+                `${props.payload.percent}% (${value} tasks)`,
+                name
+              ]}
             />
             <Legend
               verticalAlign="bottom"

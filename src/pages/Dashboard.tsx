@@ -1,8 +1,8 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { StatsCard } from '@/components/dashboard/StatsCard';
-import { SLAComplianceChart } from '@/components/dashboard/SLAComplianceChart';
 import { TasksByStatusChart } from '@/components/dashboard/TasksByStatusChart';
 import { WorkloadHeatmap } from '@/components/dashboard/WorkloadHeatmap';
+import { TaskCompletionTrend } from '@/components/dashboard/TaskCompletionTrend';
 import { TaskCard } from '@/components/tasks/TaskCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
@@ -76,9 +76,6 @@ export default function Dashboard() {
   // Pending tasks (status === 'pending')
   const pendingTasks = relevantActiveTasks.filter((t: Task) => t.status === 'pending');
 
-  // In Progress tasks
-  const inProgressTasks = relevantActiveTasks.filter((t: Task) => t.status === 'in_progress');
-
   // Delayed tasks (past due date and not completed)
   const delayedTasks = relevantActiveTasks.filter((t: Task) => 
     isPast(new Date(t.dueDate)) && t.status !== 'completed'
@@ -97,10 +94,15 @@ export default function Dashboard() {
   const mediumPriorityCount = relevantActiveTasks.filter((t: Task) => t.priority === 'medium').length;
   const lowPriorityCount = relevantActiveTasks.filter((t: Task) => t.priority === 'low').length;
 
+  const totalPriority = highPriorityCount + mediumPriorityCount + lowPriorityCount;
+  const highPercent = totalPriority > 0 ? Math.round((highPriorityCount / totalPriority) * 100) : 0;
+  const mediumPercent = totalPriority > 0 ? Math.round((mediumPriorityCount / totalPriority) * 100) : 0;
+  const lowPercent = totalPriority > 0 ? Math.round((lowPriorityCount / totalPriority) * 100) : 0;
+
   const priorityData = [
-    { name: 'High', value: highPriorityCount, color: 'hsl(0, 84%, 60%)' },
-    { name: 'Medium', value: mediumPriorityCount, color: 'hsl(38, 92%, 50%)' },
-    { name: 'Low', value: lowPriorityCount, color: 'hsl(158, 64%, 42%)' },
+    { name: 'High', value: highPriorityCount, percent: highPercent, color: 'hsl(0, 84%, 60%)' },
+    { name: 'Medium', value: mediumPriorityCount, percent: mediumPercent, color: 'hsl(38, 92%, 50%)' },
+    { name: 'Low', value: lowPriorityCount, percent: lowPercent, color: 'hsl(158, 64%, 42%)' },
   ];
 
   // Handle task card click - navigate to tasks page
@@ -163,17 +165,11 @@ export default function Dashboard() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <StatsCard
             title={isAdmin ? "Pending Tasks" : "My Pending Tasks"}
             value={pendingTasks.length}
             icon={<CheckSquare className="w-6 h-6" />}
-          />
-          <StatsCard
-            title="In Progress"
-            value={inProgressTasks.length}
-            icon={<Clock className="w-6 h-6" />}
-            iconClassName="bg-primary/10 text-primary"
           />
           <StatsCard
             title="Delayed"
@@ -194,7 +190,6 @@ export default function Dashboard() {
           {/* Tasks by Status - Bar Chart */}
           <TasksByStatusChart
             pending={pendingTasks.length}
-            inProgress={inProgressTasks.length}
             completed={completedCount}
             delayed={delayedTasks.length}
           />
@@ -218,6 +213,11 @@ export default function Dashboard() {
                       paddingAngle={4}
                       dataKey="value"
                       strokeWidth={0}
+                      label={({ value, payload }) => {
+                        const percentValue = payload?.percent ?? 0;
+                        return `${payload?.name}: ${value} (${percentValue}%)`;
+                      }}
+                      labelLine={false}
                     >
                       {priorityData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -229,13 +229,18 @@ export default function Dashboard() {
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '8px',
                       }}
-                      formatter={(value: number) => [`${value} tasks`, '']}
+                      formatter={(value: number, name: string, props: any) => [
+                        `${props.payload.percent}% (${value} tasks)`,
+                        name
+                      ]}
                     />
                     <Legend
                       verticalAlign="bottom"
                       height={36}
-                      formatter={(value) => (
-                        <span className="text-sm text-muted-foreground">{value}</span>
+                      formatter={(value, entry: any) => (
+                        <span className="text-sm text-muted-foreground">
+                          {value}: {entry.payload.value} ({entry.payload.percent}%)
+                        </span>
                       )}
                     />
                   </PieChart>
@@ -249,14 +254,15 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* SLA & Workload Row - Admin Only */}
+        {/* Charts Row - Admin Only */}
         {isAdmin && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <SLAComplianceChart
-              onTime={completedCount}
-              delayed={delayedTasks.length}
-            />
-            <WorkloadHeatmap />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-5">
+              <TaskCompletionTrend />
+            </div>
+            <div className="lg:col-span-7">
+              <WorkloadHeatmap />
+            </div>
           </div>
         )}
 

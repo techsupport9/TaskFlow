@@ -70,16 +70,6 @@ cron.schedule('0 0 * * *', async () => {
     }
 });
 
-// Auto-delete Notes Cron Job (Runs every day at 6:00 AM)
-cron.schedule('0 6 * * *', async () => {
-    console.log('Running auto-delete notes job at 6:00 AM...');
-    try {
-        const result = await Note.deleteMany({});
-        console.log(`Deleted ${result.deletedCount} notes at 6:00 AM.`);
-    } catch (error) {
-        console.error('Auto-delete notes job failed:', error);
-    }
-});
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);

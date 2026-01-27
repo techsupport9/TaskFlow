@@ -29,7 +29,9 @@ import {
   Lock,
   Eye,
   EyeOff,
+  Users,
 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 export default function Settings() {
@@ -57,6 +59,17 @@ export default function Settings() {
     confirm: false,
   });
 
+  // Super Admin password change state
+  const [selectedUserForPassword, setSelectedUserForPassword] = useState<string>('');
+  const [adminPasswordData, setAdminPasswordData] = useState({
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [showAdminPasswords, setShowAdminPasswords] = useState({
+    new: false,
+    confirm: false,
+  });
+
   // Preferences state
   const [preferences, setPreferences] = useState({
     dateFormat: 'DD/MM/YYYY',
@@ -80,6 +93,18 @@ export default function Settings() {
       const res = await api.get('/users/profile');
       return res.data;
     },
+    enabled: !!user, // Always fetch when user is available
+  });
+
+  // Fetch users for Super Admin and Admin with password change permission
+  // Must be after userProfile query to access userProfile.permissions
+  const { data: allUsers = [] } = useQuery({
+    queryKey: ['users'],
+    queryFn: async () => {
+      const res = await api.get('/users');
+      return res.data;
+    },
+    enabled: user?.role === 'super_admin' || (user?.role === 'admin' && userProfile?.permissions?.canChangePassword === true),
   });
 
   // Update local state when profile loads
@@ -120,11 +145,13 @@ export default function Settings() {
 
   // Change password mutation
   const changePasswordMutation = useMutation({
-    mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
+    mutationFn: async (data: { currentPassword?: string; newPassword: string; targetUserId?: string }) => {
       return await api.post('/users/change-password', data);
     },
     onSuccess: () => {
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setAdminPasswordData({ newPassword: '', confirmPassword: '' });
+      setSelectedUserForPassword('');
       toast.success('Password changed successfully');
     },
     onError: (err: any) => {
@@ -162,6 +189,25 @@ export default function Settings() {
     changePasswordMutation.mutate({
       currentPassword: passwordData.currentPassword,
       newPassword: passwordData.newPassword,
+    });
+  };
+
+  const handleAdminPasswordChange = () => {
+    if (!selectedUserForPassword) {
+      toast.error('Please select a user');
+      return;
+    }
+    if (adminPasswordData.newPassword !== adminPasswordData.confirmPassword) {
+      toast.error('New passwords do not match');
+      return;
+    }
+    if (adminPasswordData.newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    changePasswordMutation.mutate({
+      newPassword: adminPasswordData.newPassword,
+      targetUserId: selectedUserForPassword,
     });
   };
 
@@ -565,7 +611,7 @@ export default function Settings() {
             <div className="card-elevated p-6">
               <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
                 <Lock className="w-5 h-5" />
-                Change Password
+                Change My Password
               </h2>
               
               <div className="space-y-4 max-w-md">
@@ -639,6 +685,115 @@ export default function Settings() {
                 </Button>
               </div>
             </div>
+
+            {/* Super Admin or Admin with permission: Change Others' Passwords */}
+            {(user?.role === 'super_admin' || (user?.role === 'admin' && userProfile?.permissions?.canChangePassword === true)) && (
+              <div className="card-elevated p-6">
+                <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Change User Password
+                </h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {user?.role === 'super_admin' 
+                    ? 'As a Super Admin, you can change passwords for any user in the system.'
+                    : 'You have permission to change passwords for Core Managers.'}
+                </p>
+                
+                <div className="space-y-4 max-w-md">
+                  <div className="space-y-2">
+                    <Label htmlFor="selectUser">Select User</Label>
+                    <Select value={selectedUserForPassword} onValueChange={setSelectedUserForPassword}>
+                      <SelectTrigger id="selectUser">
+                        <SelectValue placeholder="Select a user..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allUsers
+                          .filter((u: any) => {
+                            const userId = u._id || u.id;
+                            const currentUserId = user?._id || user?.id;
+                            // Super Admin can change any user's password
+                            if (user?.role === 'super_admin') {
+                              return userId !== currentUserId;
+                            }
+                            // Admin with permission can only change Core Manager passwords
+                            if (user?.role === 'admin' && userProfile?.permissions?.canChangePassword) {
+                              return userId !== currentUserId && u.role === 'core_manager';
+                            }
+                            return false;
+                          })
+                          .map((u: any) => (
+                            <SelectItem key={u._id || u.id} value={u._id || u.id}>
+                              <div className="flex items-center gap-2">
+                                <span>{u.name}</span>
+                                <Badge variant="secondary" className="text-xs capitalize">
+                                  {u.role?.replace('_', ' ')}
+                                </Badge>
+                              </div>
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {selectedUserForPassword && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="adminNewPassword">New Password</Label>
+                        <div className="relative">
+                          <Input 
+                            id="adminNewPassword"
+                            type={showAdminPasswords.new ? 'text' : 'password'}
+                            value={adminPasswordData.newPassword}
+                            onChange={(e) => setAdminPasswordData({ ...adminPasswordData, newPassword: e.target.value })}
+                            placeholder="Enter new password"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowAdminPasswords({ ...showAdminPasswords, new: !showAdminPasswords.new })}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          >
+                            {showAdminPasswords.new ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="adminConfirmPassword">Confirm New Password</Label>
+                        <div className="relative">
+                          <Input 
+                            id="adminConfirmPassword"
+                            type={showAdminPasswords.confirm ? 'text' : 'password'}
+                            value={adminPasswordData.confirmPassword}
+                            onChange={(e) => setAdminPasswordData({ ...adminPasswordData, confirmPassword: e.target.value })}
+                            placeholder="Confirm new password"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowAdminPasswords({ ...showAdminPasswords, confirm: !showAdminPasswords.confirm })}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          >
+                            {showAdminPasswords.confirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+                      <Button 
+                        onClick={handleAdminPasswordChange}
+                        disabled={changePasswordMutation.isPending || !adminPasswordData.newPassword || !adminPasswordData.confirmPassword}
+                        className="mt-2"
+                      >
+                        {changePasswordMutation.isPending ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Changing...
+                          </>
+                        ) : (
+                          'Change User Password'
+                        )}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="card-elevated p-6">
               <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">

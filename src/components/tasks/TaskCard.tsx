@@ -24,9 +24,7 @@ const getStatusVariant = (status: string, isOverdue: boolean) => {
   if (isOverdue) return 'statusDelayed';
   switch (status) {
     case 'pending': return 'statusPending';
-    case 'in_progress': return 'statusProgress';
     case 'completed': return 'statusCompleted';
-    case 'review': return 'statusProgress';
     default: return 'default';
   }
 };
@@ -37,9 +35,7 @@ const getStatusLabel = (status: string, isOverdue: boolean, daysDelayed?: number
   }
   switch (status) {
     case 'pending': return 'Pending';
-    case 'in_progress': return 'In Progress';
     case 'completed': return 'Completed';
-    case 'review': return 'Review';
     default: return status;
   }
 };

@@ -54,6 +54,7 @@ const UserSchema = new mongoose.Schema({
         canDeleteMembers: { type: Boolean, default: true },
         canCreateTasks: { type: Boolean, default: true },
         canDeleteTasks: { type: Boolean, default: true },
+        canChangePassword: { type: Boolean, default: false }, // Password change permission
     },
     // User preferences
     preferences: {

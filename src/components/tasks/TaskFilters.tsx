@@ -103,10 +103,8 @@ export function TaskFilters({
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="in_progress">In Progress</SelectItem>
             <SelectItem value="completed">Completed</SelectItem>
             <SelectItem value="delayed">Delayed</SelectItem>
-            <SelectItem value="review">Review</SelectItem>
           </SelectContent>
         </Select>
 

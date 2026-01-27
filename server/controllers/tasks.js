@@ -673,9 +673,8 @@ export const updateTask = async (req, res) => {
                 if (updates.progress === 100) {
                     task.assignments[assignmentIndex].status = 'completed';
                     task.assignments[assignmentIndex].completedAt = new Date();
-                } else if (updates.progress > 0) {
-                    task.assignments[assignmentIndex].status = 'in_progress';
                 }
+                // Note: progress > 0 but < 100 keeps status as 'pending' (in_progress removed)
 
                 // Recalculate Global Progress
                 const total = task.assignments.reduce((acc, curr) => acc + curr.progress, 0);
@@ -698,9 +697,8 @@ export const updateTask = async (req, res) => {
                         });
                         await notification.save();
                     }
-                } else if (avg > 0) {
-                    task.status = 'in_progress';
                 }
+                // Note: avg > 0 but not all completed keeps status as 'pending' (in_progress removed)
 
                 await task.save();
 

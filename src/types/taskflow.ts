@@ -2,7 +2,7 @@ export type UserRole = 'super_admin' | 'admin' | 'core_manager';
 
 export type TaskPriority = 'high' | 'medium' | 'low';
 
-export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'delayed' | 'review' | 'archived';
+export type TaskStatus = 'pending' | 'completed' | 'delayed' | 'archived';
 
 export type NotificationType = 'task_assigned' | 'task_completed' | 'task_delayed' | 'task_commented' | 'task_transferred' | 'task_updated' | 'task_removed';
 
@@ -44,7 +44,7 @@ export interface User {
 export interface TaskAssignment {
   userId: string;
   userName?: string; // Cache
-  status: 'pending' | 'in_progress' | 'completed';
+  status: 'pending' | 'completed';
   progress: number;
   completedAt?: Date | string;
 }
@@ -137,7 +137,6 @@ export interface DashboardStats {
   totalTasks: number;
   completedTasks: number;
   delayedTasks: number;
-  inProgressTasks: number;
   pendingTasks: number;
   slaComplianceRate: number;
   averageCompletionTime: number;

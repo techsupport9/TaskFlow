@@ -21,6 +21,7 @@ interface AdminPermissions {
   canDeleteMembers: boolean;
   canCreateTasks: boolean;
   canDeleteTasks: boolean;
+  canChangePassword: boolean;
 }
 
 interface MemberCardProps {
@@ -85,7 +86,6 @@ function MemberCard({ member, isSuperAdmin, canManageTeam, currentUserId, userRo
       <div className="flex items-center justify-between pt-1.5 border-t border-border text-[9px]">
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground">{member.pending}P</span>
-          <span className="text-primary">{member.inProgress}A</span>
           <span className="text-success">{member.completed}D</span>
           <span className="text-danger">{member.delayed}L</span>
         </div>
@@ -178,7 +178,6 @@ function MemberCardCompact({ member, isSuperAdmin, canManageTeam, currentUserId,
       {/* Stats */}
       <div className="flex items-center gap-1.5 text-[9px] flex-shrink-0">
         <span className="text-muted-foreground">{member.pending}P</span>
-        <span className="text-primary">{member.inProgress}A</span>
         <span className="text-success">{member.completed}D</span>
         <span className="text-danger">{member.delayed}L</span>
       </div>
@@ -227,6 +226,7 @@ export default function Team() {
     canDeleteMembers: true,
     canCreateTasks: true,
     canDeleteTasks: true,
+    canChangePassword: false,
   });
 
   // Compute default role based on current user
@@ -239,6 +239,7 @@ export default function Team() {
     password: '',
     role: getDefaultRole(),
     department: '',
+    canChangePassword: false, // For admin creation
   });
 
   // Sync role when user changes (e.g., after auth loads)
@@ -325,7 +326,6 @@ export default function Team() {
     });
 
     const completed = userTasks.filter((t: any) => t.status === 'completed').length;
-    const inProgress = userActiveTasks.filter((t: any) => t.status === 'in_progress').length;
     const pending = userActiveTasks.filter((t: any) => t.status === 'pending').length;
     const delayed = userActiveTasks.filter((t: any) => isPast(new Date(t.dueDate)) && t.status !== 'completed').length;
 
@@ -333,7 +333,6 @@ export default function Team() {
       ...u,
       totalTasks: userActiveTasks.length, // Active tasks count for workload
       completed,
-      inProgress,
       pending,
       delayed
     };
@@ -353,6 +352,7 @@ export default function Team() {
         password: '',
         role: getDefaultRole(),
         department: '',
+        canChangePassword: false,
       });
       toast.success('User added successfully');
     },
@@ -403,6 +403,7 @@ export default function Team() {
       canDeleteMembers: admin.permissions?.canDeleteMembers ?? true,
       canCreateTasks: admin.permissions?.canCreateTasks ?? true,
       canDeleteTasks: admin.permissions?.canDeleteTasks ?? true,
+      canChangePassword: admin.permissions?.canChangePassword ?? false,
     });
     setPermissionsDialogOpen(true);
   };
@@ -526,6 +527,22 @@ export default function Team() {
                     </select>
                   </div>
                   </div>
+                  {/* Password Change Permission - Only for Admin creation by Super Admin */}
+                  {user?.role === 'super_admin' && newUser.role === 'admin' && (
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                      <div>
+                        <Label htmlFor="canChangePasswordCreate">Allow Password Changes</Label>
+                        <p className="text-xs text-muted-foreground">Grant this admin permission to change user passwords</p>
+                      </div>
+                      <Switch
+                        id="canChangePasswordCreate"
+                        checked={newUser.canChangePassword}
+                        onCheckedChange={(checked) => 
+                          setNewUser({ ...newUser, canChangePassword: checked })
+                        }
+                      />
+                    </div>
+                  )}
                   <Button type="submit" className="w-full" disabled={createMemberMutation.isPending}>
                     {createMemberMutation.isPending ? 'Adding...' : 'Add Member'}
                   </Button>
@@ -805,6 +822,24 @@ export default function Team() {
                         checked={editingPermissions.canDeleteTasks}
                         onCheckedChange={(checked) => 
                           setEditingPermissions(prev => ({ ...prev, canDeleteTasks: checked }))
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border pt-4 mt-4">
+                    <h4 className="text-sm font-medium text-muted-foreground mb-4">Security</h4>
+                    
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="canChangePassword">Can Change Password</Label>
+                        <p className="text-xs text-muted-foreground">Allow changing user passwords</p>
+                      </div>
+                      <Switch
+                        id="canChangePassword"
+                        checked={editingPermissions.canChangePassword}
+                        onCheckedChange={(checked) => 
+                          setEditingPermissions(prev => ({ ...prev, canChangePassword: checked }))
                         }
                       />
                     </div>

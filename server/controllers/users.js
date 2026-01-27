@@ -61,6 +61,7 @@ export const createMember = async (req, res) => {
                 canDeleteMembers: true,
                 canCreateTasks: true,
                 canDeleteTasks: true,
+                canChangePassword: req.body.canChangePassword || false,
             } : undefined,
         });
 
@@ -192,22 +193,52 @@ export const updateProfile = async (req, res) => {
     }
 };
 
-// Change password
+// Change password (self or by admin with permission)
 export const changePassword = async (req, res) => {
     try {
-        const { currentPassword, newPassword } = req.body;
-        const userId = req.user.id;
+        const { currentPassword, newPassword, targetUserId } = req.body;
+        const { id: requesterId, role: requesterRole } = req.user;
+        
+        // Determine target user
+        const targetId = targetUserId || requesterId;
+        const isChangingOwnPassword = targetId === requesterId;
 
-        // Get user with password
-        const user = await User.findById(userId);
-        if (!user) {
+        // Get requester user to check permissions
+        const requester = await User.findById(requesterId);
+        if (!requester) {
+            return res.status(404).json({ message: "Requester not found." });
+        }
+
+        // Get target user with password
+        const targetUser = await User.findById(targetId);
+        if (!targetUser) {
             return res.status(404).json({ message: "User not found." });
         }
 
-        // Verify current password
-        const isMatch = await bcrypt.compare(currentPassword, user.password);
-        if (!isMatch) {
-            return res.status(400).json({ message: "Current password is incorrect." });
+        // Permission checks
+        if (!isChangingOwnPassword) {
+            // Changing someone else's password
+            // Only Super Admin or Admin with canChangePassword permission
+            if (requesterRole === 'super_admin') {
+                // Super Admin can change any password - no current password needed
+            } else if (requesterRole === 'admin' && requester.permissions?.canChangePassword) {
+                // Admin with permission can change passwords - no current password needed
+            } else {
+                return res.status(403).json({ message: "You don't have permission to change passwords." });
+            }
+        } else {
+            // Changing own password - verify current password
+            if (!currentPassword) {
+                return res.status(400).json({ message: "Current password is required." });
+            }
+            const isMatch = await bcrypt.compare(currentPassword, targetUser.password);
+            if (!isMatch) {
+                return res.status(400).json({ message: "Current password is incorrect." });
+            }
+        }
+
+        if (!newPassword) {
+            return res.status(400).json({ message: "New password is required." });
         }
 
         // Hash new password
@@ -215,7 +246,7 @@ export const changePassword = async (req, res) => {
         const passwordHash = await bcrypt.hash(newPassword, salt);
 
         // Update password
-        await User.findByIdAndUpdate(userId, { password: passwordHash });
+        await User.findByIdAndUpdate(targetId, { password: passwordHash });
 
         res.status(200).json({ message: "Password changed successfully." });
     } catch (err) {
