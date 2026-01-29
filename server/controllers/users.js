@@ -5,14 +5,16 @@ export const getUsers = async (req, res) => {
     try {
         const { role, id, teamId } = req.user;
 
-        if (role === 'core_manager') {
-            return res.status(403).json({ message: 'Access denied.' });
-        }
-
         let query = {};
-        if (role === 'admin') {
-            // Admins can only see users in their own team (plus themselves)
+        if (role === 'super_admin') {
+            // Super Admin sees only Admins (frontend filters; we return all and let frontend filter, or restrict here)
+            query = { role: 'admin' };
+        } else if (role === 'admin') {
+            // Admins see users in their team plus themselves (admins + core_managers in team)
             query = { $or: [{ teamId }, { _id: id }] };
+        } else if (role === 'core_manager') {
+            // Core managers see all core managers (for Team Directory)
+            query = { role: 'core_manager' };
         }
 
         const users = await User.find(query).select('-password');
