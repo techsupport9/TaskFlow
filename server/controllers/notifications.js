@@ -15,7 +15,17 @@ export const getNotifications = async (req, res) => {
 export const markRead = async (req, res) => {
     try {
         const { id } = req.params;
-        const notification = await Notification.findByIdAndUpdate(id, { read: true }, { new: true });
+        const notification = await Notification.findById(id);
+        if (!notification) {
+            return res.status(404).json({ message: 'Notification not found' });
+        }
+
+        if (notification.userId.toString() !== req.user.id) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        notification.read = true;
+        await notification.save();
         res.status(200).json(notification);
     } catch (err) {
         res.status(404).json({ message: err.message });

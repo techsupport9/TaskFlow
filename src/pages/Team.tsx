@@ -235,7 +235,7 @@ export default function Team() {
   // Form State
   const [newUser, setNewUser] = useState({
     name: '',
-    email: '',
+    username: '',
     password: '',
     role: getDefaultRole(),
     department: '',
@@ -341,14 +341,15 @@ export default function Team() {
   // Mutations
   const createMemberMutation = useMutation({
     mutationFn: async (data: any) => {
-      await api.post('/users', data);
+      // Map username to email for the backend, which still expects `email`
+      await api.post('/users', { ...data, email: data.username });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       setIsAddMode(false);
       setNewUser({
         name: '',
-        email: '',
+        username: '',
         password: '',
         role: getDefaultRole(),
         department: '',
@@ -483,13 +484,13 @@ export default function Team() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Email</Label>
+                    <Label>Username</Label>
                     <Input
-                      type="email"
+                      type="text"
                       required
-                      value={newUser.email}
-                      onChange={e => setNewUser({ ...newUser, email: e.target.value })}
-                      placeholder="john@example.com"
+                      value={newUser.username}
+                      onChange={e => setNewUser({ ...newUser, username: e.target.value })}
+                      placeholder="john.doe"
                     />
                   </div>
                   <div className="space-y-2">
@@ -745,7 +746,9 @@ export default function Team() {
                   </Avatar>
                   <div>
                     <p className="font-medium">{selectedAdmin.name}</p>
-                    <p className="text-sm text-muted-foreground">{selectedAdmin.email}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedAdmin.username || selectedAdmin.email}
+                    </p>
                   </div>
                 </div>
 

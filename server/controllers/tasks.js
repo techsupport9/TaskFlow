@@ -37,17 +37,19 @@ export const getTasks = async (req, res) => {
         if (role === 'admin') {
             // Admin sees all tasks EXCEPT those created by Core Managers and assigned only to Core Managers
             // We'll filter these out after fetching
-        } else {
-            // Core Manager visibility: own tasks + tasks of users in their visibilityScope
-            const user = req.user; // Fully populated user from middleware
-            const visibleUserIds = [id, ...(user.visibilityScope || [])];
-
+        } else if (role === 'core_manager') {
+            // Core managers should ONLY see:
+            // - tasks assigned to them
+            // - tasks they created
             query.$or = [
-                { 'assignments.userId': { $in: visibleUserIds } },
-                { createdBy: { $in: visibleUserIds } },
-                { visibility: 'public' },
-                { visibility: 'team', teamId: user.teamId },
-                { visibility: 'custom', allowedViewers: id }
+                { 'assignments.userId': userObjectId },
+                { createdBy: userObjectId },
+            ];
+        } else {
+            // Fallback for any other roles (if introduced in future):
+            query.$or = [
+                { 'assignments.userId': userObjectId },
+                { createdBy: userObjectId },
             ];
         }
 

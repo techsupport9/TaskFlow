@@ -3,7 +3,19 @@ import bcrypt from 'bcryptjs';
 
 export const getUsers = async (req, res) => {
     try {
-        const users = await User.find().select('-password');
+        const { role, id, teamId } = req.user;
+
+        if (role === 'core_manager') {
+            return res.status(403).json({ message: 'Access denied.' });
+        }
+
+        let query = {};
+        if (role === 'admin') {
+            // Admins can only see users in their own team (plus themselves)
+            query = { $or: [{ teamId }, { _id: id }] };
+        }
+
+        const users = await User.find(query).select('-password');
         res.status(200).json(users);
     } catch (err) {
         res.status(404).json({ message: err.message });
@@ -48,6 +60,8 @@ export const createMember = async (req, res) => {
 
         const newUser = new User({
             name,
+            // For now, set username equal to email
+            username: email,
             email,
             password: passwordHash,
             role: role || (creatorRole === 'super_admin' ? 'admin' : 'core_manager'),
@@ -89,6 +103,26 @@ export const deleteUser = async (req, res) => {
             const adminUser = await User.findById(requesterId);
             if (adminUser.permissions && !adminUser.permissions.canDeleteMembers) {
                 return res.status(403).json({ message: "You don't have permission to delete members." });
+            }
+        }
+
+        const targetUser = await User.findById(id);
+        if (!targetUser) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        // Prevent deleting super admins via API except by super_admin
+        if (targetUser.role === 'super_admin' && requesterRole !== 'super_admin') {
+            return res.status(403).json({ message: 'Access denied.' });
+        }
+
+        // Admin can only delete core_manager users (and only within their team)
+        if (requesterRole === 'admin') {
+            if (targetUser.role !== 'core_manager') {
+                return res.status(403).json({ message: 'Admins can only delete core team members.' });
+            }
+            if (targetUser.teamId?.toString() !== req.user.teamId?.toString()) {
+                return res.status(403).json({ message: 'Access denied.' });
             }
         }
 

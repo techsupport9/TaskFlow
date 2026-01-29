@@ -13,6 +13,9 @@ RUN npm install --omit=dev
 # Copy application files
 COPY . .
 
+# Run as non-root for better container security
+USER node
+
 # Expose port
 EXPOSE 5000
 

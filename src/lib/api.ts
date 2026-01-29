@@ -7,11 +7,15 @@ const api = axios.create({
 // Add a request interceptor to include the Auth Token
 api.interceptors.request.use(
     (config) => {
-        const user = localStorage.getItem('taskflow_user');
-        if (user) {
-            const { token } = JSON.parse(user);
-            if (token) {
-                config.headers.Authorization = `Bearer ${token}`;
+        const session = sessionStorage.getItem('taskflow_user');
+        if (session) {
+            try {
+                const { token } = JSON.parse(session);
+                if (token) {
+                    config.headers.Authorization = `Bearer ${token}`;
+                }
+            } catch {
+                sessionStorage.removeItem('taskflow_user');
             }
         }
         return config;

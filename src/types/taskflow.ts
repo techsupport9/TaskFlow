@@ -28,6 +28,7 @@ export interface Team {
 export interface User {
   _id?: string;
   id: string; // Keep id for frontend compatibility, but often Mongoose sends _id
+  username?: string; // primary login identifier
   email: string;
   name: string;
   avatar?: string;

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Zap, Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -25,13 +25,13 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      await login(username, password);
       // Super admin goes to Team page (they manage admins, not tasks)
       // Note: Can't check role here directly since login just completed.
       // The redirect will happen via the isAuthenticated check above on next render.
       navigate('/dashboard');
     } catch (err) {
-      setError('Invalid email or password');
+      setError('Invalid username or password');
     } finally {
       setIsLoading(false);
     }
@@ -119,15 +119,15 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="username">Username</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="username"
+                  type="text"
+                  placeholder="your.username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   className="pl-10"
                   required
                 />

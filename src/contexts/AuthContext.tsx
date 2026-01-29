@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const initAuth = async () => {
-      const savedUser = localStorage.getItem('taskflow_user');
+      const savedUser = sessionStorage.getItem('taskflow_user');
       if (savedUser) {
         try {
           // Verify token validity or refresh user data here
@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         } catch (e) {
           console.error("Failed to parse user session", e);
-          localStorage.removeItem('taskflow_user');
+          sessionStorage.removeItem('taskflow_user');
         }
       }
       setIsLoading(false);
@@ -58,14 +58,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Store full object with token
       const sessionData = { user, token };
-      localStorage.setItem('taskflow_user', JSON.stringify(sessionData));
+      sessionStorage.setItem('taskflow_user', JSON.stringify(sessionData));
 
       setUser(user);
       setCompany(mockCompany);
       toast.success('Logged in successfully');
     } catch (error: any) {
       console.error(error);
-      const msg = error.response?.data?.msg || 'Login failed';
+      const msg = error.response?.data?.message || 'Login failed';
       toast.error(msg);
       throw new Error(msg);
     } finally {
@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setUser(null);
     setCompany(null);
-    localStorage.removeItem('taskflow_user');
+    sessionStorage.removeItem('taskflow_user');
     toast.info('Logged out');
   };
 
